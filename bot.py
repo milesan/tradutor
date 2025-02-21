@@ -9,10 +9,14 @@ from telegram.ext import Application, MessageHandler, CommandHandler, filters, C
 from deepl import Translator
 from dotenv import load_dotenv
 
-# Configure basic logging
+# Configure detailed logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(message)s'
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('bot.log')
+    ]
 )
 logger = logging.getLogger(__name__)
 
@@ -82,8 +86,11 @@ async def translate_text(text: str) -> Optional[str]:
 async def transcribe_audio(file_path: str) -> Tuple[str, str]:
     """Transcribe audio file and detect its language"""
     try:
-        # Transcribe with Whisper
-        result = model.transcribe(file_path)
+        logger.info(f"Starting transcription of file: {file_path}")
+        # Run transcription in a thread pool to avoid blocking
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(None, lambda: model.transcribe(file_path))
+        logger.info(f"Transcription successful: {result['text'][:100]}...")
         return result["text"], result["language"]
     except Exception as e:
         logger.error(f"Transcription failed: {e}")
@@ -103,8 +110,18 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Handle incoming messages"""
     try:
-        if update.message.from_user.is_bot:
+        if not update.message:
+            logger.info("No message in update")
             return
+            
+        if update.message.from_user.is_bot:
+            logger.info("Ignoring bot message")
+            return
+
+        # Log message type
+        logger.info(f"Received message type: voice={bool(update.message.voice)}, "
+                   f"audio={bool(update.message.audio)}, video={bool(update.message.video)}, "
+                   f"video_note={bool(update.message.video_note)}, text={bool(update.message.text)}")
 
         # Handle text messages
         if update.message.text:
@@ -117,25 +134,39 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         if update.message.voice or update.message.audio or update.message.video or update.message.video_note:
             # Send a "processing" message
             processing_msg = await update.message.reply_text("📡 Processing audio...")
+            logger.info("Started processing audio/video message")
 
             try:
+                # Get file ID
+                file_id = None
+                if update.message.voice:
+                    file_id = update.message.voice.file_id
+                elif update.message.audio:
+                    file_id = update.message.audio.file_id
+                elif update.message.video:
+                    file_id = update.message.video.file_id
+                elif update.message.video_note:
+                    file_id = update.message.video_note.file_id
+
+                logger.info(f"Got file_id: {file_id}")
+
                 # Get the file
-                file = await context.bot.get_file(
-                    update.message.voice.file_id if update.message.voice else
-                    update.message.audio.file_id if update.message.audio else
-                    update.message.video.file_id if update.message.video else
-                    update.message.video_note.file_id
-                )
+                file = await context.bot.get_file(file_id)
+                logger.info(f"Got file object: {file.file_path}")
 
                 # Download to temp file
                 with tempfile.NamedTemporaryFile(suffix='.mp4', delete=False) as temp_file:
                     await file.download_to_drive(temp_file.name)
+                    logger.info(f"Downloaded file to: {temp_file.name}")
                     
                     # Transcribe
+                    logger.info("Starting transcription...")
                     text, detected_lang = await transcribe_audio(temp_file.name)
+                    logger.info(f"Transcription complete. Text: {text[:100]}... Lang: {detected_lang}")
                     
                     # Clean up temp file
                     os.unlink(temp_file.name)
+                    logger.info("Cleaned up temp file")
 
                     if text:
                         # Translate the transcription
