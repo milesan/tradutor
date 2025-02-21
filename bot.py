@@ -20,8 +20,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Initialize Whisper model
-model = whisper.load_model("base")
+# Initialize Whisper model (using large model for better accuracy)
+logger.info("Loading Whisper large model...")
+model = whisper.load_model("large")
+logger.info("Whisper model loaded successfully")
 
 # Load environment variables
 load_dotenv()
