@@ -66,7 +66,7 @@ async def translate_text(text: str) -> Optional[str]:
         try:
             # Try Portuguese to English first
             result = translator.translate_text(text, target_lang='EN-GB')
-            detected_lang = result.detected_source_language
+            detected_lang = result.detected_source_lang
             logger.info(f"Detected language: {detected_lang}")
             
             if detected_lang.upper().startswith('PT'):
