@@ -44,7 +44,7 @@ async def translate_text(text: str) -> Optional[str]:
             # Let DeepL detect and translate to Portuguese
             result = translator.translate_text(text, target_lang='PT-PT')
             if result.text.lower() != text.lower():
-                return f"PT: {result.text}"
+                return result.text
         except Exception as e:
             logger.error(f"->PT failed: {e}")
 
@@ -52,7 +52,7 @@ async def translate_text(text: str) -> Optional[str]:
             # Let DeepL detect and translate to English
             result = translator.translate_text(text, target_lang='EN-GB')
             if result.text.lower() != text.lower():
-                return f"EN: {result.text}"
+                return result.text
         except Exception as e:
             logger.error(f"->EN failed: {e}")
 
@@ -83,7 +83,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         # Try to translate
         translated = await translate_text(update.message.text)
         if translated:
-            await update.message.reply_text(translated)
+            await update.message.get_chat().send_message(translated)
     except Exception as e:
         logger.error(f"Message handling failed: {e}")
 
