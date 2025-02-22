@@ -131,8 +131,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             try:
                 await context.bot.send_message(
                     chat_id=update.message.chat_id,
-                    text=translated,
-                    reply_to_message_id=update.message.message_id
+                    text=translated
                 )
                 logger.info("Translation sent successfully")
             except Exception as e:
